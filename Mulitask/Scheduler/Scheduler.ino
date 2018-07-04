@@ -1,5 +1,6 @@
-#include <Arduino.h>
 #include <Scheduler.h>
+#include <Task.h>
+
 
 class BlinkTask : public Task {
 
@@ -51,8 +52,7 @@ class MemTask : public Task {
 void setup() {
   Serial.begin(115200);
   Serial.println("");
-  delay(1000);
-
+  
   Scheduler.start(&blink_task);
   Scheduler.start(&print_task);
   Scheduler.start(&mem_task);
