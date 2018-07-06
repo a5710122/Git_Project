@@ -1,0 +1,14 @@
+FlowMeter	KEYWORD1
+getCurrentFlowrate	KEYWORD2
+getCurrentVolume	KEYWORD3
+getTotalFlowrate	KEYWORD4
+getTotalVolume	KEYWORD5
+tick	KEYWORD6
+count	KEYWORD7
+reset	KEYWORD8
+getPin	KEYWORD9
+getCurrentDuration	KEYWORD10
+getCurrentFrequency	KEYWORD11
+getCurrentError	KEYWORD12
+getTotalDuration	KEYWORD13
+getTotalError	KEYWORD14
