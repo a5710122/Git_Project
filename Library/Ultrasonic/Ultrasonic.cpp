@@ -19,13 +19,13 @@ float Ultrasonic::calUltra()
 {
   long duration, distance;
   digitalWrite(TRIGGER_pin, LOW);  // Added this line
-  delayMicroseconds(2); // Added this line
+  //delayMicroseconds(2); // Added this line
   digitalWrite(TRIGGER_pin, HIGH);
-  delayMicroseconds(10); // Added this line
+  //delayMicroseconds(10); // Added this line
   digitalWrite(TRIGGER_pin, LOW);
   duration = pulseIn(ECHO_pin, HIGH);
   distance = (duration/2) / 29.1;
-  return(distance);
+  //return(distance);
   //Serial.print("distance: " + distance);
   //Serial.println(" cm");
   
