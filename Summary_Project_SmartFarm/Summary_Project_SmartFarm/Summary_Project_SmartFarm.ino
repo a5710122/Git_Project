@@ -2,128 +2,268 @@
 #include <SD.h>
 #include <FlowMeter.h>
 #include <Ultrasonic.h>
-#include "index.h"   //Our HTML webpage contents with javascripts
-#include <Wire.h> 
-#include <LiquidCrystal_I2C.h>
 
+// Websocket for Node-RED
+#include <ESP8266WiFi.h>
+#include <WebSocketsClient.h>
+#include <ArduinoJson.h>
 
-#define control_pump D0        
-const int buttonPin = 10;     // pin Switch control pump manual
-const int buttonSW = 9;       // pin push button
-//==============================================================
-//                  CALL LIBRARY
-//==============================================================
+//------------------------------- Define Websocket connection -----------------//
+WebSocketsClient webSocket;
+bool connected = false;
 
-FlowMeter Meter = FlowMeter(3); //D2 -> D9 
-Ultrasonic ultrasonic(0, 2); // D3, D4
+// ------------------------------ Call library ------------------------------- //
+FlowMeter Meter = FlowMeter(4);
+Ultrasonic ultrasonic(0, 2);
 File myFile;
-LiquidCrystal_I2C lcd(0x3F, 16, 2);
 
+// -------------------------------------------------------------------------- //
 
-//==============================================================
-//                  VARIABLE
-//==============================================================
+#define control_pump D0        //Control Pump 
 
-const unsigned long period = 1000;     //Flowmeter Interrupt
-unsigned long sd_millis;      //Count time to save value to sdcard
+int mode_select = 0;   //
+int pump_statefromweb ;
+const unsigned long period = 1000; //Flowmeter Interrupt
+unsigned long sd_millis; //Count time to save value to sdcard
+unsigned long control_millis;
+
+const int buttonPin = 10;     // pin push button
+const int buttonSW = 9;
 
 int currentButtonState = LOW; // state button now
 int previousButtonState = LOW;        // state Button previous
-bool isLedOn = false;                 // state led
+
 int currentButtonM = LOW; // ค่าสถานะปัจจุบนของปุ่ม
+int previousButtonM = LOW;        // ค่าสถานะของปุ่มกดครั้งที่แล้ว
+
+//----------------------------- WebSocket Event ---------------------//
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch (type) {
+    case WStype_DISCONNECTED:
+      Serial.printf("[WSc] Disconnected! \n");
+      connected = false;
+      break;
+    case WStype_CONNECTED:
+      {
+        Serial.printf("[WSc] Connected %s\n", payload);
+        webSocket.sendTXT("Connected " + String(ESP.getChipId()));
+        connected = true;
+      }
+      break;
+    case WStype_TEXT:
+      Serial.printf("[WSc] get text %s\n", payload );
+
+      if (true) {
+        StaticJsonBuffer<200> jsonBuffer;
+        JsonObject& root = jsonBuffer.parseObject((char *)payload); // ตีความ Srting ของ Json ที่ส่งเข้า
+
+        if (!root.success()) {
+          Serial.println("parseObjse(0 failed");
+        } else {
+          String modesss = root["mode"];
+          String pump_state = root["pump_state"];
+          String nodeid = root["nodeid"];
+
+          String myNodeId = String(ESP.getChipId());  //ส่งnodeid ไปด้วยเพื่อให้รู้ว่ามาจากตัวไหน
+          if (nodeid != NULL && nodeid == myNodeId) { // ตรวจว่า nodeid ว่าตรงกันไหม
+            Serial.println(modesss);
+            if (modesss == "manual") {
+              mode_select = 0;
+            }
+            if (pump_state == "on") {
+              pump_statefromweb = 1;
+            }
+            if (pump_state == "off") {
+              pump_statefromweb = 0;
+            }
+            if (modesss == "auto") {
+              mode_select = 1;
+            }
+          }
+          String str = "node: " + myNodeId + "-> Pump" + " " + pump_state;
+          webSocket.sendTXT(str);
+
+        }
+      }
+
+      break;
+    case WStype_BIN:
+      Serial.printf("[WSc] get binary length: %u\n", length);
+      hexdump(payload, length);
+      break;
+
+  }
+}
+
+
 
 //==============================================================
 //                  SETUP
 //==============================================================
 
 void setup() {
-  
   Serial.begin(115200);
   lcd.begin();
-  lcd.print("Ultrasonic: ");
+
+  WiFi.begin("silver", "025405730");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  Serial.println();
+  Serial.print("WiFi Connected IP Address ");
+  Serial.println(WiFi.localIP());
+
+  webSocket.begin("172.19.201.179", 1880);
+  //webSocket.begin("http://node-red-server-farmcontrol.c9users.io/#flow/171f27e8.416c68", 8080);
+  webSocket.onEvent(webSocketEvent);
+  Serial.println(ESP.getChipId());
+
   pinMode(buttonPin, INPUT);
   pinMode(buttonSW, INPUT);
   pinMode(control_pump, OUTPUT);
   sd_millis = millis();
-  
-  attachInterrupt(4, MeterISR, RISING);     //Interrupt Flow meter
+  control_millis = millis();
 
-  attachInterrupt(9, control_manual, CHANGE);     //Interrupt switch control manuel
-  attachInterrupt(10, control_manual_pump, CHANGE);     //Interrupt switch control pump manuel
+  attachInterrupt(4, MeterISR, RISING); //interrupt fan Flowmeter
+  attachInterrupt(9, control_manuel, CHANGE); //interrupt if switch control manual
+  attachInterrupt(10, control_manuel_pump, CHANGE); //interrupt if switch control pump manual
 
-  Meter.reset();     // sometimes initializing the gear generates some pulses that we should ignore
-  checkSD();     //Call function "check SD card" 
-  
+  Meter.reset(); // sometimes initializing the gear generates some pulses that we should ignore
+  checkSD();
+
+
 
 }
+
+
 
 //==============================================================
 //                     LOOP
 //==============================================================
 
-void loop() {
-  float ultra = ultrasonic.calUltra();
-  lcd.setCursor(0, 1);
-  lcd.print("Ultrasonic: ");
-  lcd.setCursor(1, 0);
-  lcd.print(ultra);
-  lcd.clear();
-  
-  
-  
-  
-  //delay(period);    // wait between output updates
-  //Meter.tick(period);   // process the (possibly) counted ticks
-  //Serial.println("Currently Flow: " + String(Meter.getCurrentFlowrate()) + " l/min, " + "Total Flow Volume: " + String(Meter.getTotalVolume()));
-  Serial.print("Currently Ultrasonic: ");
-  Serial.println(ultra);
 
-  if (currentButtonM == LOW) {     // Auto Mode
-    
-    if (ultra > 35 or ultra < 20 ) { 
-      digitalWrite(control_pump, LOW); //Auto
-      Serial.println("Auto_pump: Status Pump :LOW");
-    } else {
-      digitalWrite(control_pump, HIGH); //Auto
-      Serial.println("Auto_pump: Status Pump :HIGH");
+void loop() {
+
+  unsigned long next = millis();
+  unsigned long wail = millis();
+  String Flow ;
+  String Ultra ;
+  
+  webSocket.loop();
+
+  if (millis() - next > period) {
+    next = millis();
+    Serial.print("Connect status: ");
+    Serial.println(connected);
+
+    Flow = String(Meter.getCurrentFlowrate());
+    Meter.tick(period);   // process the (possibly) counted ticks
+    Ultra = String(ultrasonic.calUltra());
+
+
+    if (connected == false) {
+      Serial.println("Connection Lost! go to offine mode");
+      if (currentButtonM == LOW ) {
+        Serial.println("in to control_Auto_pump");
+
+        if (ultrasonic.calUltra() > 35 or ultrasonic.calUltra() < 20) { //Auto
+          digitalWrite(control_pump, LOW); //Auto
+          Serial.println("Auto_pump: Status Pump :LOW");
+        } else {
+          digitalWrite(control_pump, HIGH); //Auto
+          Serial.println("Auto_pump: Status Pump :HIGH");
+        }
+      }
+
+      if (currentButtonM == HIGH ) {
+
+
+        if (currentButtonState == HIGH) {
+          digitalWrite(control_pump, HIGH);
+          Serial.println("manual_pump: control pump ON");
+
+        } else if (currentButtonState == LOW) {
+          digitalWrite(control_pump, LOW);
+          Serial.println("manual_pump: control pump OFF");
+        }
+      }
+    }
+
+    if (connected == true) {
+
+      if (mode_select == 1) {
+
+        Serial.println("in to control_Auto_pump from web");
+
+        if (ultrasonic.calUltra() > 35 or ultrasonic.calUltra() < 20) { //Auto
+          digitalWrite(control_pump, LOW); //Auto
+          Serial.println("Auto_pump_web: Status Pump :LOW");
+        } else {
+          digitalWrite(control_pump, HIGH); //Auto
+          Serial.println("Auto_pump_web: Status Pump :HIGH");
+        }
+      } else if (mode_select == 0) {
+
+        Serial.println("in to control_manuel_pump from web ");
+        if (pump_statefromweb == 1) {
+          digitalWrite(control_pump, HIGH);
+          Serial.println("manual_pump_web: control pump ON");
+        } else if (pump_statefromweb == 0) {
+          digitalWrite(control_pump, LOW);
+          Serial.println("manual_pump_web: control pump OFF");
+        }
+      }
     }
   }
 
-  if (currentButtonM == HIGH) {     // manual Mode
-    
-    if (currentButtonState == HIGH) {
-      digitalWrite(control_pump, HIGH);
-      Serial.println("manual_pump: control pump ON");
-      
-    }else if (currentButtonState == LOW){
-      digitalWrite(control_pump, LOW);
-      Serial.println("manual_pump: control pump OFF");
-    } 
-  }
+  String nodeId = String(ESP.getChipId());
 
-  unsigned long now_millis = millis();
-  if (now_millis - sd_millis > 60 * 15 * 1000) {     //Check time for save value
-    writeData();
-    sd_millis = now_millis;
-  }
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+
+
+  root["nodeid"] = nodeId;
+  root["flow"] = Flow;
+  root["Ultrasonic"] = Ultra;
+  delay(1000);
+  String str;
+  root.printTo(str);
+
+  webSocket.sendTXT(str);
+
+
+  //unsigned long now_millis = millis();
+  //if (now_millis - sd_millis > 1000) {
+  //lcd.clear();
+  //lcd.print("Ultra");
+  //delay(4000);
+  //}
+
 }
+
+
+
+
 
 //==============================================================
 //                     OTHET FUNCTION
 //==============================================================
 
-// ---------- Control Manual & Control Pump Manual -------------
 
-void control_manual() {
+// --------------------------------------------------------------
+void control_manuel() {
   currentButtonM = digitalRead(buttonSW);
-  Serial.print("in to control manual: " );
+  Serial.print("in to control manule: " );
   Serial.println(currentButtonM);
 
 }
 
-void control_manual_pump() {
+void control_manuel_pump() {
   currentButtonState = digitalRead(buttonPin);
-  Serial.print("in to control manual pump: " );
+  Serial.print("in to control manule pump: " );
   Serial.println(currentButtonState);
 }
 
@@ -185,5 +325,3 @@ void readData() {
     Serial.println("error opening test.txt");
   }
 }
-
-
