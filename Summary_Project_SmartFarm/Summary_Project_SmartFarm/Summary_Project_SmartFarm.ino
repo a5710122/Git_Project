@@ -104,9 +104,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void setup() {
   Serial.begin(115200);
-  lcd.begin();
+  //lcd.begin();
 
-  WiFi.begin("silver", "025405730");
+  WiFi.begin("Maka", "");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(500);

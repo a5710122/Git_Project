@@ -8,9 +8,16 @@ Ultrasonic ultrasonic(0, 2); //Ultrasonic D3, D4
 LiquidCrystal_I2C lcd(0x27, 16, 2); //LCD D1, D2
 
 #define control_pump D0 //Control Pump D0
-const int control_button = 12;     // pin push change button  ???
-const int manual_button = 13;     // pin push change button  ???
+//const int control_button = 12;     // pin push change button  ???
+//const int manual_button = 13;     // pin push change button  ???
+const int buttonPin = 10;     // pin push button
+const int buttonSW = 9;
 
+int currentButtonState = LOW; // state button now
+int previousButtonState = LOW;        // state Button previous
+
+int currentButtonM = LOW; // ค่าสถานะปัจจุบนของปุ่ม
+int previousButtonM = LOW;        // ค่าสถานะของปุ่มกดครั้งที่แล้ว
 
 long stage = 0; // state button now
 
@@ -28,10 +35,12 @@ void setup() {
   lcd.begin();
   lcd.setCursor(0, 0);
   lcd.print("SmartFarm");
-  pinMode(control_button, INPUT);
+  pinMode(buttonPin, INPUT);
+  pinMode(buttonSW, INPUT);
   pinMode(control_pump, OUTPUT);
-  attachInterrupt(12, change_stage, RISING); //interrupt
-  attachInterrupt(13, manual_pump_stage, RISING); //interrupt fan Flowmeter
+  attachInterrupt(9, control_manuel, CHANGE); //interrupt if switch control manual
+  attachInterrupt(10, control_manuel_pump, CHANGE); //interrupt if switch control pump manual
+
   attachInterrupt(14, MeterISR, RISING); //interrupt fan Flowmeter
   Meter.reset();
 
@@ -111,22 +120,21 @@ void Show_Status_LCD() {
   lcd.print("WaterLevel: " + String(Ultra) + " cm");
   lcd.print(" Flow: " + String(Flow) + " L/m");
   lcd.scrollDisplayLeft();  // scroll one position left:
+  delay(500);
   positionCounter >= 20 ? positionCounter = 0 : positionCounter ++ ;
 
 }
 
-void change_stage() {
-  stage++;
-  delay(100);
+void control_manuel() {
+  currentButtonM = digitalRead(buttonSW);
+  Serial.print("in to control manule: " );
+  Serial.println(currentButtonM);
+
 }
 
-void manual_pump_stage () {
-  if (stage_manual_pump == HIGH) {
-    stage_manual_pump = LOW;
-  } else {
-    stage_manual_pump = HIGH;
-  }
-  delay(200);
-
+void control_manuel_pump() {
+  currentButtonState = digitalRead(buttonPin);
+  Serial.print("in to control manule pump: " );
+  Serial.println(currentButtonState);
 }
 

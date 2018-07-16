@@ -1,4 +1,4 @@
-const int buttonPin = 12;     // ขา pin ที่เราจะใช้อ่านค่าการกด push button
+const int buttonPin = 9 ;     // ขา pin ที่เราจะใช้อ่านค่าการกด push button
 const int ledPin =  16;      // ขา pin ที่เราใช้ส่งออกไฟไปยัง LED
 
 int currentButtonState = LOW; // ค่าสถานะปัจจุบนของปุ่ม
@@ -37,6 +37,5 @@ void loop() {
 
   // จำค่าการกดปุ่ม ณ ปัจจุบันไว้ เพื่อนำไปใช้เปรียบเทียบครั้งต่อไป
   previousButtonState = currentButtonState;
-  Serial.println("stage");
-  Serial.println(stage);
+  
 }
