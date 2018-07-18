@@ -13,25 +13,22 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   // บอกระบบว่า เราจะใช้ขา 8 เป็นตัวรับค่าเข้ามา
   pinMode(buttonPin, INPUT);
+  attachInterrupt(9, change_stage, RISING); //interrupt
 }
 
 void loop() {
-  // อ่านค่าสถานะของ push switch (ว่ากด หรือ ไม่กด)
+   Serial.println(stage);
+}
+
+void change_stage() {
   currentButtonState = digitalRead(buttonPin);
-
-  // ตรวจสอบกรณีที่สถานะปุ่มกดไม่เหมือนครั้งที่แล้วและครั้งนี้สถานะเป็นปล่อย
-  // ซึ่งก็คือปุ่มถูกกดค้างไว้และได้ถูกปล่อยออกนั่นเอง
+  
   if ((currentButtonState != previousButtonState) && previousButtonState == HIGH) {
-    // สั่งให้ค่า led เป็นตรงกันข้าม (ถ้าเปิดให้ปิด ถ้าปิดให้เปิด)
-    isLedOn = !isLedOn;
-    // ส่งค่าไปยังขา 13 เพื่อให้เปิดหรือปิด led ตามสถานะปัจจุบัน
-    digitalWrite(ledPin, isLedOn);
-    // หน่วงเวลา 0.1 วินาทีหน่วงค่าความคลาดเคลื่อนตอนเริ่มต้นกด switch
-
-    stage = stage + 1;
-    if (stage == 3) {
-      stage = 0;
-    }
+    
+    stage ++;
+//    if (stage == 3) {
+//      stage = 0;
+//    }
     delay(100);
   }
 
