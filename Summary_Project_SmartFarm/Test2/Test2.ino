@@ -11,13 +11,12 @@
 #include <PubSubClient.h>
 
 // Basic pin reading and pullup test for the MCP23017 I/O expander
-// Connect pin #12 of the expander to Analog 5 (i2c clock)
-// Connect pin #13 of the expander to Analog 4 (i2c data)
+// Connect pin #12 of the expander to D2 (i2c clock)
+// Connect pin #13 of the expander to D1 (i2c data)
 // Connect pins #15, 16 and 17 of the expander to ground (address selection)
 // Connect pin #9 of the expander to 5V (power)
 // Connect pin #10 of the expander to ground (common ground)
 // Connect pin #18 through a ~10kohm resistor to 5V (reset pin, active low)
-// Output #0 is on pin 21 so connect an LED or whatever from that to ground
 
 //===================================== PIN ================================//
 
@@ -39,7 +38,6 @@ unsigned long sensor_millis; //Count time to take value sensor
 unsigned long check_millis; //Count time to take reconnect server
 unsigned long sd_millis; //Count time to save value to sd card
 
-
 long stage = 0; // state button now
 String show_stage; //show stage to lcd
 
@@ -48,10 +46,10 @@ boolean manual_pump = LOW; //Stage pump (manual)
 
 //===================================== MQTT ================================//
 
-const char* ssid = "true_homewifi_99C";
-const char* password =  "00000RY2";
+const char* ssid = "Maka";
+const char* password =  "";
 
-const char* mqttServer = "192.168.1.35";
+const char* mqttServer = "172.19.201.74";
 const int mqttPort = 1883;
 const char* mqttUser = "s5710122";
 const char* mqttPassword = "ap18659993";
@@ -67,9 +65,16 @@ void setup() {
   sd_millis = millis(); //Set time to count for take value
   mcp.begin(); // MCP use default address 0
   Serial.begin (115200);
+  lcd.begin();
   setup_LCD();
   setup_wifi();
+  lcd.setCursor(0, 0);
+  lcd.print("Wifi connect");
+  lcd.clear();
   setup_MQTT();
+  lcd.setCursor(0, 0);
+  lcd.print("MQTT connect");
+  lcd.clear();
   check_sd();
   
   pinMode(switch_stage, INPUT); //Call pin in nodemcu input
@@ -84,9 +89,22 @@ void setup() {
 
   Meter.reset();
 
-  client.publish("esp/pump", "Hello from ESP8266"); //Start massgea if esp connect server
+  client.publish("esp/pump", "Hello from ESP8266"); //Start messages if esp connect server
   client.subscribe("esp/pump"); //subscribe topic "esp/pump"
   client.subscribe("esp/manual");
+  myFile = SD.open("database.txt", FILE_WRITE);
+  // if the file opened okay, write to it:
+  if (myFile) {
+    Serial.print("Start messages from ESP8266 writing to database.txt...");
+    myFile.print("Start messages from ESP8266");
+    // close the file:
+    myFile.close();
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening database.txt");
+  }
+
 
 }
 
@@ -108,8 +126,9 @@ void loop() {
     sensor_millis = now_millis; //set time default
   }
 
+  // Counttime save value to database
   unsigned long now_millis_3 = millis(); //Count time
-  if (now_millis_3 - sd_millis > 60 * 1000) { //Countdown time 1 minute
+  if (now_millis_3 - sd_millis > 360 * 1000) { //Countdown time 1 minute
     check_sd();
     write_sd();
     read_sd();
@@ -128,8 +147,7 @@ void loop() {
   }
 
   switch (stage) {
-    Switch case
-
+    
       case 0 : //case 0 auto mode
       if (Ultra > 35 or Ultra < 20) { //Auto
         mcp.digitalWrite(MCP_control_pump, LOW); //Auto
@@ -216,7 +234,7 @@ void change_stage_manual() {
 }
 
 void setup_LCD() {
-  lcd.begin(); //LCD
+ 
   lcd.setCursor(0, 0);
   lcd.print("SmartFarm");
   lcd.clear();
